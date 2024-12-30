@@ -1,4 +1,5 @@
 package src.server;
+
 import src.shared.*;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
@@ -6,44 +7,35 @@ import java.rmi.registry.Registry;
 import java.rmi.server.*;
 import java.util.*;
 
-
-
 public class GameServer extends UnicastRemoteObject implements GameServerInterface {
     private List<Player> players;
     private GameField field;
 
-       // Costruttore della classe GameServer
-       public GameServer() throws RemoteException {
-        super();  // Necessario per UnicastRemoteObject
-        this.players = new ArrayList<>(); // Inizializza la lista dei giocatori
-        this.field = new GameField(10, 5); // Inizializza il campo di gioco con 10x5
+    public GameServer() throws RemoteException {
+        super();
+        this.players = new ArrayList<>();
+        this.field = new GameField(10, 5);
     }
 
-     // Main method to start the RMI server
     public static void main(String[] args) {
         try {
-            // Create a new instance of the GameServer
             GameServer server = new GameServer();
-
-            // Set up the RMI registry (on port 1099 by default)
             Registry registry = LocateRegistry.createRegistry(1099);
-            
-            // Bind the server to the RMI registry with the name "GameServer"
             registry.rebind("GameServer", server);
-            
             System.out.println("GameServer is running and waiting for clients...");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    @Override
     public synchronized void registerPlayer(String playerName) throws RemoteException {
         Player newPlayer = new Player(playerName, field.getRandomEmptyPosition());
         players.add(newPlayer);
         broadcast("Player " + playerName + " has joined the game!");
     }
 
-
+    @Override
     public synchronized String movePlayer(String playerName, int dx, int dy) throws RemoteException {
         Player player = findPlayer(playerName);
         if (player == null) return "Player not found!";
@@ -57,6 +49,24 @@ public class GameServer extends UnicastRemoteObject implements GameServerInterfa
             }
         }
         return moved ? "Move successful!" : "Invalid move!";
+    }
+
+    public synchronized void triggerSnapshot() throws RemoteException {
+        System.out.println("Snapshot process started.");
+        broadcastMarker();
+        recordGlobalState();
+    }
+
+    private void broadcastMarker() {
+        players.forEach(player -> player.notifyMessage("MARKER"));
+    }
+
+    private synchronized void recordGlobalState() {
+        GlobalSnapshot snapshot = new GlobalSnapshot(
+            new ArrayList<>(players), // Deep copy of players
+            field // Reference to the game field (assume immutable)
+        );
+        System.out.println("Global state recorded: " + snapshot);
     }
 
     private void checkSweetCollection(Player player) {

@@ -1,8 +1,7 @@
 package src.server;
+
 import java.util.*;
-
 import src.shared.*;
-
 
 public class GameField {
     private int size;

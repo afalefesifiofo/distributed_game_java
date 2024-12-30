@@ -1,7 +1,6 @@
 package src.server;
+
 import src.shared.*;
-
-
 
 public class Player {
     private String name;
@@ -44,7 +43,14 @@ public class Player {
     }
 
     public void notifyMessage(String message) {
-        // Log the message to the console or use another communication method
-        System.out.println("Player " + name + ": " + message);
+        if ("MARKER".equals(message)) {
+            recordState();
+        } else {
+            System.out.println("Player " + name + ": " + message);
+        }
+    }
+
+    public void recordState() {
+        System.out.println("Player " + name + " state: Position=" + position + ", Score=" + score);
     }
 }
