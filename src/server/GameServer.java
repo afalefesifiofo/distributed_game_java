@@ -30,16 +30,46 @@ public class GameServer extends UnicastRemoteObject implements GameServerInterfa
 
     @Override
     public synchronized void registerPlayer(String playerName) throws RemoteException {
-        Player newPlayer = new Player(playerName, field.getRandomEmptyPosition());
+        Position pos = field.getRandomEmptyPosition();
+        // Check for conflicts without using a lambda
+        while (true) {
+            boolean conflict = false;
+            for (Player p : players) {
+                if (p.getPosition().equals(pos)) {
+                    conflict = true;
+                    break;
+                }
+            }
+            if (!conflict) {
+                break;
+            }
+            pos = field.getRandomEmptyPosition();
+        }
+        Player newPlayer = new Player(playerName, pos);
         players.add(newPlayer);
-        broadcast("Player " + playerName + " has joined the game!");
+        broadcast("Player " + playerName + " has joined the game at position " + pos + "!");
     }
+    
 
     @Override
     public synchronized String movePlayer(String playerName, int dx, int dy) throws RemoteException {
         Player player = findPlayer(playerName);
         if (player == null) return "Player not found!";
         
+        // Compute the new position based on the current position and movement deltas
+        Position currentPos = player.getPosition();
+        Position newPos = new Position(currentPos.x + dx, currentPos.y + dy);
+        
+        // Check if another player is already occupying the new position
+        boolean occupied = players.stream()
+            .filter(p -> !p.getName().equals(playerName))
+            .anyMatch(p -> p.getPosition().equals(newPos));
+        
+        if (occupied) {
+            return "Invalid move: position " + newPos + " is already occupied!";
+        }
+        
+        // Attempt to move the player (this method should also enforce field boundaries)
         boolean moved = player.move(dx, dy, field);
         if (moved) {
             broadcast(playerName + " moved to position " + player.getPosition());
@@ -64,7 +94,7 @@ public class GameServer extends UnicastRemoteObject implements GameServerInterfa
     private synchronized void recordGlobalState() {
         GlobalSnapshot snapshot = new GlobalSnapshot(
             new ArrayList<>(players), // Deep copy of players
-            field // Reference to the game field (assume immutable)
+            field // Reference to the game field (assumed immutable)
         );
         System.out.println("Global state recorded: " + snapshot);
     }
@@ -90,7 +120,9 @@ public class GameServer extends UnicastRemoteObject implements GameServerInterfa
     }
 
     private Player findPlayer(String playerName) {
-        return players.stream().filter(p -> p.getName().equals(playerName)).findFirst().orElse(null);
+        return players.stream()
+                .filter(p -> p.getName().equals(playerName))
+                .findFirst().orElse(null);
     }
 
     private void broadcast(String message) {
